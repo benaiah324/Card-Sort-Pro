@@ -1,0 +1,126 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String   @id @default(cuid())
+  name          String?
+  email         String   @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?  // for Credentials provider
+  role          Role     @default(SORTER)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  assignedBundles BundleAssignment[]
+  scanLogs        ScanLog[]
+  issues          Issue[]
+
+  assignedCards   CardRecord[] @relation("AssignedTo")
+  sortedCards     CardRecord[] @relation("SortedBy")
+  createdBundles  AssignmentBundle[]
+
+  @@map("users")
+}
+
+model CardRecord {
+  id              String   @id @default(cuid())
+  jobId           String?
+  serialNumber    Int?
+  state           String?
+  lga             String?
+  ward            String?
+  accountName     String?
+  accountNumber   String?
+  maskPan         String   @unique
+
+  status          Status   @default(UNASSIGNED)
+  assignedTo      String?
+  sortedBy        String?
+  sortedAt        DateTime?
+  notes           String?
+
+  UserAssigned    User?    @relation("AssignedTo", fields: [assignedTo], references: [id], onDelete: SetNull)
+  UserSorted      User?    @relation("SortedBy", fields: [sortedBy], references: [id], onDelete: SetNull)
+
+  scanLogs        ScanLog[]
+  issues          Issue[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("card_records")
+}
+
+model AssignmentBundle {
+  id          String   @id @default(cuid())
+  name        String
+  createdBy   String
+  createdAt   DateTime @default(now())
+
+  filters     Json     // { jobIds: string[], snRanges: [{min: number, max: number}], lgas: string[], wards: string[] }
+
+  assignments BundleAssignment[]
+
+  creator     User     @relation(fields: [createdBy], references: [id])
+
+  @@map("assignment_bundles")
+}
+
+model BundleAssignment {
+  id          String   @id @default(cuid())
+  bundleId    String
+  sorterId    String
+  assignedAt  DateTime @default(now())
+  completedAt DateTime?
+
+  bundle      AssignmentBundle @relation(fields: [bundleId], references: [id])
+  sorter      User             @relation(fields: [sorterId], references: [id])
+
+  @@map("bundle_assignments")
+}
+
+model ScanLog {
+  id              String   @id @default(cuid())
+  cardRecordId    String
+  sorterId        String
+  scannedAt       DateTime @default(now())
+  ocrConfidence   Float?
+  status          String
+
+  cardRecord      CardRecord @relation(fields: [cardRecordId], references: [id])
+  sorter          User       @relation(fields: [sorterId], references: [id])
+
+  @@map("scan_logs")
+}
+
+model Issue {
+  id           String   @id @default(cuid())
+  cardRecordId String
+  sorterId     String
+  note         String
+  resolvedAt   DateTime?
+  resolvedBy   String?
+
+  cardRecord   CardRecord @relation(fields: [cardRecordId], references: [id])
+  sorter       User       @relation(fields: [sorterId], references: [id])
+
+  @@map("issues")
+}
+
+enum Role {
+  ADMIN
+  SORTER
+}
+
+enum Status {
+  UNASSIGNED
+  ASSIGNED
+  SORTED
+  ISSUE
+}
